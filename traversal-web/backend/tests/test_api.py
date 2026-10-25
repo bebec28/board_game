@@ -65,3 +65,53 @@ def test_bot_game(client):
     assert human_again.status_code == 409
     r = client.post(f"/api/games/{gid}/bot-move")
     assert r.status_code == 200 and r.json()["state"]["current_turn"] == 1
+
+
+def test_explain_and_hint(client):
+    game = client.post("/api/games", json={"terrain": "woodlands", "mode": "local", "seed": 3}).json()
+    gid = game["id"]
+    r = client.get(f"/api/games/{gid}/explain", params={"piece": "p1_7", "row": 0, "col": 7})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["legal"] is False and body["reason"] == "too_far" and body["path"][0] == [9, 7]
+    assert client.get(f"/api/games/{gid}/explain", params={"piece": "nope", "row": 0, "col": 0}).status_code == 422
+    hint = client.get(f"/api/games/{gid}/hint").json()
+    moves = client.get(f"/api/games/{gid}/moves").json()
+    assert any(m["to_row"] == hint["to_row"] and m["to_col"] == hint["to_col"] for m in moves[hint["piece_id"]])
+
+
+def test_variant_game_army_phase_local(client):
+    game = client.post("/api/games", json={"terrain": "woodlands", "mode": "local", "variants": True}).json()
+    gid = game["id"]
+    assert game["phase"] == "army" and game["variants"] is True and game["army_ready"] == [False, False]
+    assert "army_choices" not in game
+    assert client.get(f"/api/games/{gid}/moves").json() == {}
+    assert client.post(f"/api/games/{gid}/move", json={"piece_id": "p1_4", "to_row": 8, "to_col": 4}).status_code == 409
+    assert client.get(f"/api/games/{gid}/hint").status_code == 409
+
+    bad = client.post(f"/api/games/{gid}/army", json={"player": 1, "choices": {"p1_3": "messenger"}})
+    assert bad.status_code == 422
+
+    r = client.post(f"/api/games/{gid}/army", json={"player": 1, "choices": {"p1_4": "messenger"}})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["army_ready"] == [True, False] and body["phase"] == "army"
+    # Red's choice stays secret until Blue is in.
+    assert next(p for p in body["pieces"] if p["id"] == "p1_4")["type"] == "explorer"
+
+    r = client.post(f"/api/games/{gid}/army", json={"player": 2, "choices": {}})
+    body = r.json()
+    assert body["phase"] == "play"
+    assert next(p for p in body["pieces"] if p["id"] == "p1_4")["type"] == "messenger"
+    assert client.post(f"/api/games/{gid}/army", json={"player": 2, "choices": {}}).status_code == 409
+    assert "p1_4" in client.get(f"/api/games/{gid}/moves").json()
+
+
+def test_variant_game_bot_picks_its_army_up_front(client):
+    game = client.post("/api/games", json={"terrain": "woodlands", "mode": "bot", "variants": True}).json()
+    gid = game["id"]
+    assert game["army_ready"] == [False, True]
+    assert client.post(f"/api/games/{gid}/army", json={"player": 2, "choices": {}}).status_code == 409
+    assert client.post(f"/api/games/{gid}/bot-move").status_code == 409
+    r = client.post(f"/api/games/{gid}/army", json={"player": 1, "choices": {"p1_5": "messenger"}})
+    assert r.json()["phase"] == "play"

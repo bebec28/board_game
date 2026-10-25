@@ -78,6 +78,10 @@ class GameStateOut(BaseModel):
     bot_player: int | None
     terrain: str
     seed: int | None
+    variants: bool
+    phase: Literal["army", "play"]
+    # Whether each player has submitted their (secret) army.
+    army_ready: list[bool]
     board: list[list[int]]
     pieces: list[PieceOut]
     current_turn: int
@@ -98,6 +102,13 @@ class CreateGameIn(BaseModel):
     mode: GameMode = "local"
     bot_player: int | None = Field(default=None, ge=1, le=2)
     seed: int | None = None
+    variants: bool = False
+
+
+class ArmyIn(BaseModel):
+    player: int = Field(ge=1, le=2)
+    # Piece id -> chosen type; omitted pieces stay classic.
+    choices: dict[str, str] = Field(default_factory=dict)
 
 
 class PlayMoveIn(BaseModel):
@@ -130,3 +141,28 @@ class TerrainOut(BaseModel):
     id: str
     label: str
     description: str
+
+
+class ExplanationOut(BaseModel):
+    piece_id: str
+    to_row: int
+    to_col: int
+    reason: str
+    legal: bool
+    movement: int
+    hypothetical: bool
+    path: list[tuple[int, int]]
+    step_costs: list[int]
+    path_cost: int | None
+    free_path: list[tuple[int, int]]
+    free_cost: int | None
+    blockers: list[str]
+    occupant_id: str | None
+    is_special: bool
+    combat: CombatOut | None = None
+
+
+class HintOut(BaseModel):
+    piece_id: str
+    to_row: int
+    to_col: int

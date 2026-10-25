@@ -1,12 +1,23 @@
 import type {
+  Explanation,
   GameMode,
   GameState,
   GeneratedBoard,
+  Hint,
   LegalMoves,
   MoveResult,
+  PieceType,
   Player,
   Terrain,
 } from './types'
+
+export interface NewGameOptions {
+  terrain: string
+  mode: GameMode
+  bot_player?: Player
+  seed?: number
+  variants?: boolean
+}
 
 export class ApiError extends Error {
   status: number
@@ -41,8 +52,13 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ mode, seed }),
     }),
-  createGame: (opts: { terrain: string; mode: GameMode; bot_player?: Player; seed?: number }) =>
+  createGame: (opts: NewGameOptions) =>
     request<GameState>('/games', { method: 'POST', body: JSON.stringify(opts) }),
+  submitArmy: (id: string, player: Player, choices: Record<string, PieceType>) =>
+    request<GameState>(`/games/${id}/army`, {
+      method: 'POST',
+      body: JSON.stringify({ player, choices }),
+    }),
   getGame: (id: string) => request<GameState>(`/games/${id}`),
   getMoves: (id: string, both = false) =>
     request<LegalMoves>(`/games/${id}/moves${both ? '?both=true' : ''}`),
@@ -52,6 +68,9 @@ export const api = {
       body: JSON.stringify({ piece_id, to_row, to_col }),
     }),
   botMove: (id: string) => request<MoveResult>(`/games/${id}/bot-move`, { method: 'POST' }),
+  explain: (id: string, piece: string, row: number, col: number) =>
+    request<Explanation>(`/games/${id}/explain?piece=${encodeURIComponent(piece)}&row=${row}&col=${col}`),
+  hint: (id: string) => request<Hint>(`/games/${id}/hint`),
   resign: (id: string, player: Player) =>
     request<GameState>(`/games/${id}/resign`, {
       method: 'POST',
