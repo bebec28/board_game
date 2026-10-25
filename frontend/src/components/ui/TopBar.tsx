@@ -1,12 +1,22 @@
-import { Link } from 'react-router'
+import { Link, NavLink } from 'react-router'
 
 export default function TopBar({ right }: { right?: React.ReactNode }) {
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-line bg-panel px-4">
-      <Link to="/" className="flex items-center gap-2.5">
-        <Logo />
-        <span className="text-lg font-extrabold tracking-tight">Traversal</span>
-      </Link>
+      <div className="flex items-center gap-5">
+        <Link to="/" className="flex items-center gap-2.5">
+          <Logo />
+          <span className="text-lg font-extrabold tracking-tight">Traversal</span>
+        </Link>
+        <NavLink
+          to="/tutoriel"
+          className={({ isActive }) =>
+            `rounded-md px-2.5 py-1 text-sm font-semibold transition ${isActive ? 'bg-panel-2 text-ink' : 'text-ink-muted hover:text-ink'}`
+          }
+        >
+          Tutoriel
+        </NavLink>
+      </div>
       <div className="flex items-center gap-3 text-sm text-ink-muted">{right}</div>
     </header>
   )

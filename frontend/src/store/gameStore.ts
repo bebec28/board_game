@@ -1,6 +1,6 @@
 import { create } from 'zustand'
-import { api, ApiError } from '../api/client'
-import type { GameMode, GameState, LegalMoves, Move, Player } from '../api/types'
+import { api, ApiError, type NewGameOptions } from '../api/client'
+import type { Explanation, GameState, Hint, LegalMoves, Move, PieceType, Player } from '../api/types'
 
 export type ViewPreset =
   | 'red'
@@ -37,8 +37,25 @@ interface GameStore {
   view: ViewPreset
   autoFlip: boolean
   lastMove: { from: [number, number]; to: [number, number] } | null
+  /** "Pourquoi ?" mode: clicking a square the selected piece cannot reach explains why. */
+  helpMode: boolean
+  explanation: Explanation | null
+  /** Bumped to replay the explanation animation. */
+  explanationRun: number
+  hint: Hint | null
+  hintLoading: boolean
+  /** Both armies were just revealed; play (and the bot) waits until the players dismiss it. */
+  armyReveal: boolean
 
-  newGame: (opts: { terrain: string; mode: GameMode; bot_player?: Player; seed?: number }) => Promise<GameState>
+  setHelpMode: (on: boolean) => void
+  explainSquare: (row: number, col: number) => Promise<void>
+  replayExplanation: () => void
+  clearExplanation: () => void
+  requestHint: () => Promise<void>
+  clearHint: () => void
+  newGame: (opts: NewGameOptions) => Promise<GameState>
+  submitArmy: (player: Player, choices: Record<string, PieceType>) => Promise<void>
+  dismissArmyReveal: () => void
   loadGame: (id: string) => Promise<void>
   refreshMoves: () => Promise<void>
   selectPiece: (id: string | null) => void
@@ -72,6 +89,51 @@ export const useGameStore = create<GameStore>((set, get) => ({
   lastMove: null,
   viewedPly: null,
   showMovesFor: 'current',
+  helpMode: false,
+  explanation: null,
+  explanationRun: 0,
+  hint: null,
+  hintLoading: false,
+  armyReveal: false,
+
+  setHelpMode(on) {
+    set({ helpMode: on, explanation: null })
+  },
+
+  async explainSquare(row, col) {
+    const { game, selectedPieceId } = get()
+    if (!game || !selectedPieceId) return
+    try {
+      const explanation = await api.explain(game.id, selectedPieceId, row, col)
+      set((s) => ({ explanation, explanationRun: s.explanationRun + 1, hint: null }))
+    } catch (e) {
+      set({ error: errorMessage(e) })
+    }
+  },
+
+  replayExplanation() {
+    set((s) => ({ explanationRun: s.explanationRun + 1 }))
+  },
+
+  clearExplanation() {
+    set({ explanation: null })
+  },
+
+  async requestHint() {
+    const { game, botThinking, animating, viewedPly } = get()
+    if (!game || game.game_over || game.phase !== 'play' || botThinking || animating || viewedPly !== null) return
+    set({ hintLoading: true, explanation: null })
+    try {
+      const hint = await api.hint(game.id)
+      set({ hint, selectedPieceId: hint.piece_id, hintLoading: false })
+    } catch (e) {
+      set({ hintLoading: false, error: errorMessage(e) })
+    }
+  },
+
+  clearHint() {
+    set({ hint: null })
+  },
 
   setShowMovesFor(v) {
     set({ showMovesFor: v, selectedPieceId: null })
@@ -96,11 +158,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   async newGame(opts) {
-    set({ loading: true, error: null, game: null, legalMoves: {}, selectedPieceId: null, lastMove: null, viewedPly: null })
+    set({ loading: true, error: null, game: null, legalMoves: {}, selectedPieceId: null, lastMove: null, viewedPly: null, explanation: null, hint: null, armyReveal: false })
     try {
       const game = await api.createGame(opts)
-      set({ game, loading: false, view: 'red' })
+      set({ game, loading: false, view: game.bot_player === 1 ? 'blue' : 'red' })
       await get().refreshMoves()
+      void get().requestBotMove()
       return game
     } catch (e) {
       set({ loading: false, error: errorMessage(e) })
@@ -108,8 +171,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
   },
 
+  async submitArmy(player, choices) {
+    const game = get().game
+    if (!game || game.phase !== 'army') return
+    try {
+      const state = await api.submitArmy(game.id, player, choices)
+      set({ game: state, selectedPieceId: null, armyReveal: state.phase === 'play' })
+    } catch (e) {
+      set({ error: errorMessage(e) })
+    }
+  },
+
+  dismissArmyReveal() {
+    set({ armyReveal: false })
+    void get().refreshMoves()
+    void get().requestBotMove()
+  },
+
   async loadGame(id) {
-    set({ loading: true, error: null, selectedPieceId: null, lastMove: null, viewedPly: null })
+    set({ loading: true, error: null, selectedPieceId: null, lastMove: null, viewedPly: null, explanation: null, hint: null, armyReveal: false })
     try {
       const game = await api.getGame(id)
       set({ game, loading: false })
@@ -138,13 +218,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { game, animating, botThinking, viewedPly } = get()
     if (!game || animating || botThinking || viewedPly !== null) return
     if (id === null) {
-      set({ selectedPieceId: null })
+      set({ selectedPieceId: null, explanation: null, hint: null })
       return
     }
     const piece = game.pieces.find((p) => p.id === id)
     if (!piece) return
     // Selecting any piece shows its stat card; only the side to move gets highlighted moves.
-    set({ selectedPieceId: id })
+    const hint = get().hint
+    set({ selectedPieceId: id, explanation: null, hint: hint && hint.piece_id === id ? hint : null })
   },
 
   setHovered(key) {
@@ -154,7 +235,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   async playMove(pieceId, move) {
     const { game, animating, botThinking, viewedPly } = get()
     if (!game || animating || botThinking || viewedPly !== null) return
-    set({ animating: true, error: null })
+    set({ animating: true, error: null, explanation: null, hint: null })
     try {
       const result = await api.playMove(game.id, pieceId, move.to_row, move.to_col)
       const applied = result.applied
@@ -180,7 +261,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   async requestBotMove() {
     const game = get().game
     if (!game || game.game_over || game.mode !== 'bot' || game.current_turn !== game.bot_player) return
-    if (get().botThinking) return
+    if (game.phase !== 'play' || get().armyReveal || get().botThinking) return
     set({ botThinking: true, legalMoves: {} })
     const started = Date.now()
     try {
@@ -191,6 +272,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       set({
         game: result.state,
         animating: true,
+        explanation: null,
+        hint: null,
         lastMove: { from: [applied.from_row, applied.from_col], to: [applied.to_row, applied.to_col] },
       })
       await sleep(MOVE_ANIMATION_MS)

@@ -6,6 +6,8 @@ import Sidebar from '../components/ui/Sidebar'
 import BoardScene from '../components/three/BoardScene'
 import GameOverOverlay from '../components/ui/GameOverOverlay'
 import ReplayBanner from '../components/ui/ReplayBanner'
+import { HelpCard, HelpToolbar } from '../components/ui/HelpPanel'
+import { ArmyPicker, ArmyReveal } from '../components/ui/ArmyPhase'
 import { PLAYER_COLORS, PLAYER_NAMES } from '../lib/colors'
 
 export default function GamePage() {
@@ -21,6 +23,9 @@ export default function GamePage() {
   const viewedPly = useGameStore((s) => s.viewedPly)
   const stepReplay = useGameStore((s) => s.stepReplay)
   const viewPly = useGameStore((s) => s.viewPly)
+  const helpShown = useGameStore((s) => s.explanation !== null || s.hint !== null)
+  const armyReveal = useGameStore((s) => s.armyReveal)
+  const dismissArmyReveal = useGameStore((s) => s.dismissArmyReveal)
 
   useEffect(() => {
     if (id && (!game || game.id !== id)) void loadGame(id)
@@ -53,12 +58,14 @@ export default function GamePage() {
 
   const replayEntry = game && viewedPly !== null && viewedPly > 0 ? game.history[viewedPly - 1] : null
 
-  const playAgain = async () => {
+  const playAgain = async (swapSides = false) => {
     if (!game) return
+    const botPlayer = game.bot_player && swapSides ? (game.bot_player === 1 ? 2 : 1) : game.bot_player
     const g = await newGame({
       terrain: game.terrain,
       mode: game.mode,
-      bot_player: game.bot_player ?? undefined,
+      bot_player: botPlayer ?? undefined,
+      variants: game.variants,
     })
     navigate(`/game/${g.id}`)
   }
@@ -71,7 +78,9 @@ export default function GamePage() {
             <>
               <span className="rounded-md bg-panel-2 px-2 py-1 capitalize">{game.terrain}</span>
               <span className="rounded-md bg-panel-2 px-2 py-1">{game.mode === 'bot' ? 'Contre le bot' : 'Deux joueurs'}</span>
-              {!game.game_over && (
+              {game.variants && <span className="rounded-md bg-panel-2 px-2 py-1">Variantes</span>}
+              {game.phase === 'army' && <span className="rounded-md bg-panel-2 px-2 py-1">Composition des armées</span>}
+              {!game.game_over && game.phase === 'play' && (
                 <span className="flex items-center gap-1.5 rounded-md bg-panel-2 px-2 py-1">
                   <span className="h-2.5 w-2.5 rounded-full" style={{ background: PLAYER_COLORS[game.current_turn] }} />
                   {botThinking ? 'Le bot réfléchit…' : `Au tour de ${PLAYER_NAMES[game.current_turn]}`}
@@ -95,9 +104,20 @@ export default function GamePage() {
             </div>
           )}
           {game && <BoardScene />}
-          {game && <Legend />}
+          {game && !helpShown && game.phase === 'play' && <Legend />}
+          {game && game.phase === 'play' && <HelpToolbar game={game} />}
+          {game && game.phase === 'army' && <ArmyPicker game={game} />}
+          {game && armyReveal && <ArmyReveal game={game} onClose={dismissArmyReveal} />}
+          {game && !error && <HelpCard game={game} />}
           {game && viewedPly !== null && <ReplayBanner game={game} ply={viewedPly} entry={replayEntry} />}
-          {game && viewedPly === null && <GameOverOverlay game={game} onPlayAgain={() => void playAgain()} />}
+          {game && viewedPly === null && (
+            <GameOverOverlay
+              key={game.id}
+              game={game}
+              onPlayAgain={(swap) => void playAgain(swap)}
+              onReview={() => viewPly(0)}
+            />
+          )}
           {error && game && (
             <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-lg border border-red/50 bg-panel px-4 py-2 text-sm shadow-lg">
               {error}

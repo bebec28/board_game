@@ -1,9 +1,12 @@
 from .apply import apply_move, compute_scores, resign
-from .models import GameState, HistoryEntry, IllegalMoveError, Move, Piece
+from .explain import Explanation, explain_move
+from .models import ArmyError, GameState, HistoryEntry, IllegalMoveError, Move, Piece
 from .moves import all_valid_moves, find_move, valid_moves
-from .setup import new_game
+from .setup import new_game, submit_army
 
 __all__ = [
+    "ArmyError",
+    "Explanation",
     "GameState",
     "HistoryEntry",
     "IllegalMoveError",
@@ -12,8 +15,10 @@ __all__ = [
     "all_valid_moves",
     "apply_move",
     "compute_scores",
+    "explain_move",
     "find_move",
     "new_game",
     "resign",
+    "submit_army",
     "valid_moves",
 ]

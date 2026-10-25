@@ -8,6 +8,13 @@ PIECE_STATS: dict[str, dict[str, int]] = {
     "explorer": {"movement": 5, "strength": 1},
     "vanguard": {"movement": 4, "strength": 2},
     "sentinel": {"movement": 3, "strength": 3},
+    # Variant pieces (see VARIANT_OF).
+    "messenger": {"movement": 6, "strength": 0},
+}
+
+# Classic piece type -> the variant a player may swap it for during the army phase.
+VARIANT_OF: dict[str, str] = {
+    "explorer": "messenger",
 }
 
 # (type, column) for each piece; identical for both players.
