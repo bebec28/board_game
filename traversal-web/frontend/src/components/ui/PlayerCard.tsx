@@ -10,7 +10,7 @@ interface Props {
 
 export default function PlayerCard({ game, player, botThinking }: Props) {
   const isBot = game.mode === 'bot' && game.bot_player === player
-  const active = !game.game_over && game.current_turn === player
+  const active = !game.game_over && game.phase === 'play' && game.current_turn === player
   const alive = game.pieces.filter((p) => p.player === player && !p.is_captured && !p.is_finished)
   const finished = game.pieces.filter((p) => p.player === player && p.is_finished)
   const captured = game.pieces.filter((p) => p.player === player && p.is_captured)

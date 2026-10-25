@@ -48,10 +48,11 @@ cd frontend && npm run build
 |---|---|
 | `engine/moves.py` | Génération des coups légaux (BFS avec coût de dénivelé, attaques, arrivées, spéciaux Explorateur). Port de la fonction `A` du moteur de référence. |
 | `engine/combat.py` | Forces effectives (hauteur, alliés, renforts). |
+| `engine/setup.py` | Position initiale ; avec les variantes, phase « army » où chaque joueur choisit en secret (`submit_army`) la pièce classique ou sa variante (`VARIANT_OF` dans `constants.py`, ex. Explorateur → Messager). |
 | `engine/apply.py` | Application d'un coup, fins de partie (2 arrivées, Sentinelle première, élimination, limite de 200 plis, répétition). |
 | `engine/notation.py` | Notation des coups (`V d10-d7`, `S f6xf5`, `E e2~off`). |
 | `terrain/` | Générateur (marche aléatoire contrainte, |Δh| ≤ 2), presets, contrôle d'équité. |
-| `bot/` | Évaluation statique + choix glouton avec vérification de la meilleure réponse adverse. |
+| `bot/` | Évaluation statique + choix glouton avec vérification de la meilleure réponse adverse ; `army.py` choisit l'armée du bot en mode variantes. |
 | `api/` | Routes REST, schémas Pydantic. `store/` : stockage en mémoire derrière un `Protocol`. |
 
 ### API

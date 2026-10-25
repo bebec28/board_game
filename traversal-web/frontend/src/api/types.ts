@@ -1,6 +1,9 @@
 // Mirrors backend/app/api/schemas.py
 
-export type PieceType = 'explorer' | 'vanguard' | 'sentinel'
+export type ClassicPieceType = 'explorer' | 'vanguard' | 'sentinel'
+/** Variant pieces a player may swap a classic piece for during the army phase. */
+export type VariantPieceType = 'messenger'
+export type PieceType = ClassicPieceType | VariantPieceType
 export type Player = 1 | 2
 export type GameMode = 'local' | 'bot'
 
@@ -72,6 +75,11 @@ export interface GameState {
   bot_player: Player | null
   terrain: string
   seed: number | null
+  variants: boolean
+  /** 'army': players are secretly choosing classic or variant pieces; 'play' afterwards. */
+  phase: 'army' | 'play'
+  /** Whether Red / Blue have submitted their army. */
+  army_ready: [boolean, boolean]
   board: number[][]
   pieces: Piece[]
   current_turn: Player
@@ -104,4 +112,42 @@ export interface GeneratedBoard {
   board: number[][]
   seed: number
   mode: string
+}
+
+export type ExplainReason =
+  | 'game_over'
+  | 'piece_gone'
+  | 'same_square'
+  | 'own_piece'
+  | 'cannot_attack'
+  | 'legal'
+  | 'leap_blocked'
+  | 'combat_too_weak'
+  | 'too_far'
+  | 'blocked'
+
+/** Why a piece can or cannot reach a square (the "Pourquoi ?" help). */
+export interface Explanation {
+  piece_id: string
+  to_row: number
+  to_col: number
+  reason: ExplainReason
+  legal: boolean
+  movement: number
+  hypothetical: boolean
+  path: [number, number][]
+  step_costs: number[]
+  path_cost: number | null
+  free_path: [number, number][]
+  free_cost: number | null
+  blockers: string[]
+  occupant_id: string | null
+  is_special: boolean
+  combat: Combat | null
+}
+
+export interface Hint {
+  piece_id: string
+  to_row: number
+  to_col: number
 }

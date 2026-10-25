@@ -103,6 +103,8 @@ def apply_move(state: GameState, piece_id: str, to_row: int, to_col: int) -> Gam
     """Return a new GameState with the move applied. Raises IllegalMoveError."""
     if state.game_over:
         raise IllegalMoveError("game is over")
+    if state.phase != "play":
+        raise IllegalMoveError("armies are not chosen yet")
     piece = state.piece(piece_id)
     if piece is None:
         raise IllegalMoveError(f"unknown piece {piece_id}")

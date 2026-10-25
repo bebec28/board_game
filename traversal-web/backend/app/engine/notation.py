@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from .models import Move, Piece
 
-PIECE_LETTER = {"explorer": "E", "vanguard": "V", "sentinel": "S"}
+PIECE_LETTER = {"explorer": "E", "vanguard": "V", "sentinel": "S", "messenger": "M"}
 
 
 def square_name(row: int, col: int) -> str:

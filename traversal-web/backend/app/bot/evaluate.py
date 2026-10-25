@@ -8,6 +8,10 @@ from ..engine.models import GameState
 
 WIN = 1000.0
 
+# The Messenger scores nothing and cannot fight, but its exit ends the game: it is worth
+# something on its own, and pushing it forward pays off only while we lead on score.
+MESSENGER_MATERIAL = 2.0
+
 
 def evaluate(state: GameState, me: int) -> float:
     if state.game_over:
@@ -29,9 +33,14 @@ def evaluate(state: GameState, me: int) -> float:
         if not p.alive:
             continue
         sign = 1.0 if p.player == me else -1.0
-        material += sign * 3.0 * p.strength
         progressed = (size - 1 - p.row) if p.player == 1 else p.row
-        advance += sign * 0.4 * p.strength * progressed
+        if p.type == "messenger":
+            leading = state.scores[p.player - 1] > state.scores[2 - p.player]
+            material += sign * MESSENGER_MATERIAL
+            advance += sign * 0.4 * (1.5 if leading else 0.3) * progressed
+        else:
+            material += sign * 3.0 * p.strength
+            advance += sign * 0.4 * p.strength * progressed
         height += sign * 0.3 * state.board[p.row][p.col]
         if p.player == me:
             for dr, dc in ORTHOGONAL:

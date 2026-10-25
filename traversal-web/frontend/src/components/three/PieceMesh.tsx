@@ -2,7 +2,7 @@ import { Component, Suspense, useEffect, useMemo, useRef, type ReactNode } from 
 import * as THREE from 'three'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
-import type { Piece } from '../../api/types'
+import type { Piece, PieceType, Player } from '../../api/types'
 import { squareXZ, topY } from '../../lib/coords'
 import { PLAYER_COLORS } from '../../lib/colors'
 import { ALL_PIECE_MODEL_URLS, PIECE_MODELS } from '../../lib/pieces'
@@ -70,16 +70,10 @@ export default function PieceMesh({ piece, height, selected, selectable, threate
     },
   }
 
-  const fallback = <PrimitiveShape piece={piece} glow={glow} />
-
   return (
     <group ref={group}>
       <group {...handlers}>
-        <ModelErrorBoundary fallback={fallback}>
-          <Suspense fallback={fallback}>
-            <GltfShape url={PIECE_MODELS[piece.type][piece.player]} glow={glow} />
-          </Suspense>
-        </ModelErrorBoundary>
+        <PieceModel type={piece.type} player={piece.player} glow={glow} />
       </group>
       {selected && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
@@ -93,8 +87,35 @@ export default function PieceMesh({ piece, height, selected, selectable, threate
 
 type Glow = { color: string; intensity: number } | null
 
+/**
+ * A piece's 3D model standing at the origin (base at y = 0), with a geometric fallback while
+ * the GLB loads. `opacity` < 1 draws a translucent "ghost" (used by the help and the tutorial).
+ */
+export function PieceModel({
+  type,
+  player,
+  glow = null,
+  opacity = 1,
+}: {
+  type: PieceType
+  player: Player
+  glow?: Glow
+  opacity?: number
+}) {
+  const fallback = <PrimitiveShape type={type} player={player} glow={glow} opacity={opacity} />
+  const model = PIECE_MODELS[type]
+  if (!model) return fallback
+  return (
+    <ModelErrorBoundary fallback={fallback}>
+      <Suspense fallback={fallback}>
+        <GltfShape url={model[player]} glow={glow} opacity={opacity} />
+      </Suspense>
+    </ModelErrorBoundary>
+  )
+}
+
 /** The user's GLB model, normalised so it stands centred on the square with its base at y = 0. */
-function GltfShape({ url, glow }: { url: string; glow: Glow }) {
+function GltfShape({ url, glow, opacity }: { url: string; glow: Glow; opacity: number }) {
   const gltf = useGLTF(url)
 
   const { scene, scale, offset, materials } = useMemo(() => {
@@ -134,6 +155,14 @@ function GltfShape({ url, glow }: { url: string; glow: Glow }) {
     }
   }, [glow, materials])
 
+  useEffect(() => {
+    for (const m of materials) {
+      m.transparent = opacity < 1
+      m.opacity = opacity
+      m.depthWrite = opacity >= 1
+    }
+  }, [opacity, materials])
+
   return (
     <group position={offset} scale={scale}>
       <primitive object={scene} />
@@ -142,24 +171,37 @@ function GltfShape({ url, glow }: { url: string; glow: Glow }) {
 }
 
 /** Simple geometric piece, used while a model loads or if it fails to load. */
-function PrimitiveShape({ piece, glow }: { piece: Piece; glow: Glow }) {
+function PrimitiveShape({
+  type,
+  player,
+  glow,
+  opacity,
+}: {
+  type: PieceType
+  player: Player
+  glow: Glow
+  opacity: number
+}) {
   const geometry = useMemo(() => {
-    switch (piece.type) {
+    switch (type) {
       case 'explorer':
         return new THREE.ConeGeometry(PIECE_RADIUS, PIECE_HEIGHT, 5)
       case 'vanguard':
         return wedgeGeometry()
       case 'sentinel':
         return new THREE.CylinderGeometry(PIECE_RADIUS * 0.9, PIECE_RADIUS * 0.9, PIECE_HEIGHT, 3)
+      case 'messenger':
+        // Six-sided base (Movement 6), flat top with no points (Strength 0).
+        return new THREE.CylinderGeometry(PIECE_RADIUS * 0.55, PIECE_RADIUS, PIECE_HEIGHT * 0.75, 6)
     }
-  }, [piece.type])
-  const color = PLAYER_COLORS[piece.player]
+  }, [type])
+  const color = PLAYER_COLORS[player]
   return (
     <mesh
       geometry={geometry}
-      position={[0, piece.type === 'vanguard' ? 0.01 : PIECE_HEIGHT / 2 + 0.01, 0]}
-      rotation={piece.type === 'sentinel' ? [0, Math.PI / 6, 0] : [0, 0, 0]}
-      castShadow
+      position={[0, primitiveY(type), 0]}
+      rotation={type === 'sentinel' ? [0, Math.PI / 6, 0] : [0, 0, 0]}
+      castShadow={opacity >= 1}
     >
       <meshStandardMaterial
         color={color}
@@ -167,9 +209,18 @@ function PrimitiveShape({ piece, glow }: { piece: Piece; glow: Glow }) {
         metalness={0.2}
         emissive={glow ? glow.color : '#000000'}
         emissiveIntensity={glow ? glow.intensity : 0}
+        transparent={opacity < 1}
+        opacity={opacity}
       />
     </mesh>
   )
+}
+
+/** Height of a primitive's centre so its base rests on the square. */
+function primitiveY(type: PieceType): number {
+  if (type === 'vanguard') return 0.01
+  if (type === 'messenger') return (PIECE_HEIGHT * 0.75) / 2 + 0.01
+  return PIECE_HEIGHT / 2 + 0.01
 }
 
 /** Square base, two-point ridge on top ("diamond wedge"). */

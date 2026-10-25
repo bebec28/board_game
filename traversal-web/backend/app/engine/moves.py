@@ -23,6 +23,10 @@ def valid_moves(state: GameState, piece_id: str) -> list[Move]:
     piece = state.piece(piece_id)
     if piece is None or not piece.alive or piece.player != state.current_turn:
         return []
+    if state.phase != "play":
+        return []
+    # The Messenger never attacks, and may only step off the board from where it began the turn.
+    messenger = piece.type == "messenger"
 
     board, pieces, size = state.board, state.pieces, state.size
     start = (piece.row, piece.col)
@@ -43,7 +47,7 @@ def valid_moves(state: GameState, piece_id: str) -> list[Move]:
         r, c, rem = queue.popleft()
         if rem < remaining.get((r, c), -1):
             continue  # stale entry
-        if rem >= 1 and (r, c) != start and is_final_row(piece, r, size):
+        if rem >= 1 and (r, c) != start and not messenger and is_final_row(piece, r, size):
             finish_hits.append((r, c))
         for dr, dc in ORTHOGONAL:
             nr, nc = r + dr, c + dc
@@ -54,7 +58,7 @@ def valid_moves(state: GameState, piece_id: str) -> list[Move]:
                 continue
             occupant = piece_at(pieces, nr, nc)
             if occupant is not None:
-                if occupant.player != piece.player:
+                if occupant.player != piece.player and not messenger:
                     spent = piece.movement - rem + cost
                     prev = attacks.get((nr, nc))
                     if prev is None or spent < prev[0]:

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { api } from '../api/client'
 import type { GameMode, GeneratedBoard, Player, Terrain } from '../api/types'
 import { useGameStore } from '../store/gameStore'
@@ -13,6 +13,7 @@ export default function HomePage() {
   const [terrain, setTerrain] = useState('random')
   const [mode, setMode] = useState<GameMode>('local')
   const [botPlayer, setBotPlayer] = useState<Player>(2)
+  const [variants, setVariants] = useState(false)
   const [preview, setPreview] = useState<GeneratedBoard | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -48,6 +49,7 @@ export default function HomePage() {
         mode,
         bot_player: mode === 'bot' ? botPlayer : undefined,
         seed: preview?.seed,
+        variants,
       })
       navigate(`/game/${g.id}`)
     } catch (e) {
@@ -67,6 +69,18 @@ export default function HomePage() {
             <p className="mt-1 text-sm text-ink-muted">
               Choisis un terrain. Chaque partie se joue sur un plateau différent : traverse-le, capture, et fais sortir tes pièces par le bord opposé.
             </p>
+
+            <Link
+              to="/tutoriel"
+              className="group mt-5 flex items-center gap-3 rounded-xl border border-gold/40 bg-gold/10 px-4 py-3 transition hover:border-gold/70 hover:bg-gold/15"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gold/25 text-lg">▶</span>
+              <span className="flex-1">
+                <span className="block font-semibold">Nouveau ? Apprends les règles en animation</span>
+                <span className="block text-xs text-ink-muted">12 courtes leçons : déplacement, relief, combat, score…</span>
+              </span>
+              <span className="text-gold transition group-hover:translate-x-1">→</span>
+            </Link>
 
             <h2 className="mt-7 text-xs font-semibold uppercase tracking-widest text-ink-muted">Terrain</h2>
             <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -106,6 +120,23 @@ export default function HomePage() {
                 </div>
               )}
             </div>
+
+            <h2 className="mt-7 text-xs font-semibold uppercase tracking-widest text-ink-muted">Pièces</h2>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Toggle active={!variants} onClick={() => setVariants(false)}>
+                Classiques
+              </Toggle>
+              <Toggle active={variants} onClick={() => setVariants(true)}>
+                Variantes (choix secret)
+              </Toggle>
+            </div>
+            {variants && (
+              <p className="mt-2 max-w-xl text-xs leading-relaxed text-ink-muted">
+                Après avoir vu le terrain, chaque joueur choisit en secret, pièce par pièce, la version classique ou sa variante.
+                Disponible : le <span className="font-semibold text-ink">Messager</span> (6/0) à la place de l'Explorateur. Il ne combat pas
+                et sa sortie ne rapporte rien, mais elle compte comme l'une des 2 sorties qui terminent la partie.
+              </p>
+            )}
 
             <div className="mt-8 flex items-center gap-3">
               <button

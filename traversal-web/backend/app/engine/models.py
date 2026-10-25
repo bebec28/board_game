@@ -12,10 +12,14 @@ class IllegalMoveError(ValueError):
     """Raised when a requested move is not in the piece's legal move list."""
 
 
+class ArmyError(ValueError):
+    """Raised when an army choice is invalid or submitted outside the army phase."""
+
+
 @dataclass
 class Piece:
     id: str
-    type: str  # "explorer" | "vanguard" | "sentinel"
+    type: str  # "explorer" | "vanguard" | "sentinel" | variant ("messenger")
     player: int  # 1 | 2
     row: int
     col: int
@@ -92,6 +96,13 @@ class GameState:
     bot_player: int | None = None
     terrain: str = "random"
     seed: int | None = None
+    # With variants on, the game opens in the "army" phase: each player secretly picks, for each
+    # piece, the classic type or its variant. Play starts once both armies are in.
+    variants: bool = False
+    phase: str = "play"  # "army" | "play"
+    # Pending secret choices (piece id -> type) per player; None until submitted. Never sent to
+    # clients as-is: the API only exposes whether each player is ready.
+    army_choices: list[dict[str, str] | None] = field(default_factory=lambda: [None, None])
     version: int = 0
     current_turn: int = 1
     move_count: int = 0

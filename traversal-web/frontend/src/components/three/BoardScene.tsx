@@ -8,6 +8,8 @@ import Terrain from './Terrain'
 import PieceMesh from './PieceMesh'
 import MoveHighlights from './MoveHighlights'
 import CameraRig from './CameraRig'
+import ExplainPath from './ExplainPath'
+import HintMarker from './HintMarker'
 
 export default function BoardScene() {
   const game = useGameStore((s) => s.game)
@@ -21,6 +23,11 @@ export default function BoardScene() {
   const viewedPly = useGameStore((s) => s.viewedPly)
   const showMovesFor = useGameStore((s) => s.showMovesFor)
   const liveLastMove = useGameStore((s) => s.lastMove)
+  const helpMode = useGameStore((s) => s.helpMode)
+  const explanation = useGameStore((s) => s.explanation)
+  const explanationRun = useGameStore((s) => s.explanationRun)
+  const explainSquare = useGameStore((s) => s.explainSquare)
+  const hint = useGameStore((s) => s.hint)
 
   const replaying = viewedPly !== null
   const replay = useMemo(
@@ -48,13 +55,27 @@ export default function BoardScene() {
         void playMove(selectedPieceId, attack)
         return
       }
+      // Help mode: clicking an enemy the selected piece cannot capture explains why.
+      if (helpMode && selectedPiece && piece.player !== selectedPiece.player) {
+        void explainSquare(piece.row, piece.col)
+        return
+      }
       selectPiece(piece.id === selectedPieceId ? null : piece.id)
     },
-    [game, animating, botThinking, replaying, previewOnly, selectedMoves, selectedPieceId, playMove, selectPiece],
+    [
+      game, animating, botThinking, replaying, previewOnly, selectedMoves, selectedPieceId,
+      selectedPiece, helpMode, playMove, selectPiece, explainSquare,
+    ],
   )
 
   const onSquareClick = useCallback(
     (row: number, col: number) => {
+      if (helpMode && selectedPieceId && !replaying) {
+        const move = previewOnly ? null : selectedMoves.find((m) => m.to_row === row && m.to_col === col && !m.can_finish)
+        if (move) void playMove(selectedPieceId, move)
+        else void explainSquare(row, col)
+        return
+      }
       if (!selectedPieceId || previewOnly) {
         selectPiece(null)
         return
@@ -63,7 +84,7 @@ export default function BoardScene() {
       if (move) void playMove(selectedPieceId, move)
       else selectPiece(null)
     },
-    [selectedMoves, selectedPieceId, previewOnly, playMove, selectPiece],
+    [selectedMoves, selectedPieceId, previewOnly, helpMode, replaying, playMove, selectPiece, explainSquare],
   )
 
   const onPick = useCallback(
@@ -76,6 +97,7 @@ export default function BoardScene() {
   if (!game) return null
 
   const pieces = replay ? replay.pieces : game.pieces
+  const hintPiece = hint ? game.pieces.find((p) => p.id === hint.piece_id) : undefined
   const lastMove = replay ? replay.lastMove : liveLastMove
 
   return (
@@ -83,7 +105,9 @@ export default function BoardScene() {
       shadows
       camera={{ position: [0, 9.5, 11.5], fov: 42, near: 0.1, far: 100 }}
       dpr={[1, 2]}
-      onPointerMissed={() => selectPiece(null)}
+      onPointerMissed={() => {
+        if (!helpMode) selectPiece(null)
+      }}
       style={{ background: 'radial-gradient(ellipse at center, #3a3733 0%, #262522 70%)' }}
     >
       <ambientLight intensity={0.55} />
@@ -119,6 +143,9 @@ export default function BoardScene() {
       {selectedMoves.length > 0 && (
         <MoveHighlights moves={selectedMoves} board={game.board} preview={previewOnly} onPick={onPick} />
       )}
+
+      {explanation && !replaying && <ExplainPath explanation={explanation} game={game} run={explanationRun} />}
+      {hint && !replaying && !animating && hintPiece && <HintMarker hint={hint} piece={hintPiece} board={game.board} />}
 
       <ContactShadows position={[0, -0.23, 0]} opacity={0.5} scale={14} blur={2.2} far={3} />
       <CameraRig view={view} />
