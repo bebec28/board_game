@@ -2,6 +2,8 @@
 
 A novel board game that addresses issues prominent in many games, but particularly classical games, such as chess and go.
 
+> **Jouer à Traversal dans le navigateur** : le jeu complet (plateau 3D, deux joueurs sur le même écran ou contre un bot, relecture des coups) est dans [`traversal-web/`](traversal-web/README.md).
+
 ## Origin Story
 Something about [chess](https://en.wikipedia.org/wiki/Chess) never felt quite right to me. It's perhaps the most popular board game to ever exist. It's touted as intellectual sparring and revered for all the possibilities and complex gameplay. However, it greatly rewards memorization and studying. It's impossible to get far without learning the opening theory and new players are punished by early game traps. Particularly in the modern computer era it's all the more accessible to study various computer lines out 40 moves and curbstomp online players simply because one has memorized all the variations of a specific move sequence.
 
